@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>サバイバルカード作成ツール</title>
+<!-- html2canvas と jsPDF の読み込み -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; }
+  body { background: #f4f6f8; color: #333; padding: 20px; }
+  .container { max-width: 1100px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 20px; }
+  
+  /* 左側：入力フォーム */
+  .form-section { flex: 1; min-width: 320px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .form-section h2 { font-size: 1.2rem; margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; }
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; }
+  .form-group input, .form-group textarea { width: 100%; padding: 8px; font-size: 0.9rem; border: 1px solid #ccc; border-radius: 4px; }
+  .form-row { display: flex; gap: 10px; }
+  .form-row .form-group { flex: 1; }
+  
+  .btn-group { margin-top: 20px; display: flex; gap: 10px; }
+  .btn { flex: 1; padding: 12px; font-size: 1rem; font-weight: bold; color: #fff; border: none; border-radius: 6px; cursor: pointer; text-align: center; }
+  .btn-pdf { background-color: #27ae60; }
+  .btn-print { background-color: #2980b9; }
+  .btn:hover { opacity: 0.9; }
+
+  /* 右側：プレビュー */
+  .preview-section { flex: 1; min-width: 340px; display: flex; flex-direction: column; align-items: center; }
+  .preview-title { font-size: 1rem; font-weight: bold; margin-bottom: 10px; color: #555; }
+  
+  /* サバイバルカード本体デザイン */
+  #card-container { width: 380px; background: #fff; border: 2px solid #000; font-size: 12px; color: #000; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+  .card-header { background: #555; color: #fff; text-align: center; font-weight: bold; font-size: 16px; padding: 6px 0; border-bottom: 2px solid #000; }
+  
+  table.card-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.card-table td, table.card-table th { border: 1px solid #000; padding: 4px 6px; vertical-align: top; word-wrap: break-word; }
+  
+  .bg-gray { background: #f0f0f0; font-weight: bold; }
+  .section-header { background: #333; color: #fff; font-weight: bold; text-align: left; padding: 4px 6px; border-top: 2px solid #000; border-bottom: 1px solid #000; }
+  .val { min-height: 18px; white-space: pre-wrap; font-size: 11px; }
+
+  .photo-box { width: 100%; height: 100%; min-height: 90px; border: 1px dashed #aaa; display: flex; align-items: center; justify-content: center; color: #888; font-size: 11px; overflow: hidden; }
+  .photo-box img { max-width: 100%; max-height: 110px; object-fit: cover; }
+
+  .notice { font-size: 0.8rem; color: #e74c3c; margin-top: 10px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 左：入力エリア -->
+  <div class="form-section">
+    <h2>サバイバルカード 情報入力</h2>
+    
+    <div class="form-group">
+      <label>氏名（ふりがな）</label>
+      <input type="text" id="in-name" placeholder="板橋 太郎（いたばし たろう）" oninput="updateCard()">
+    </div>
+    
+    <div class="form-row">
+      <div class="form-group">
+        <label>性別</label>
+        <input type="text" id="in-gender" placeholder="男 / 女" oninput="updateCard()">
+      </div>
+      <div class="form-group">
+        <label>血液型</label>
+        <input type="text" id="in-blood" placeholder="A型" oninput="updateCard()">
+      </div>
+      <div class="form-group">
+        <label>生年月日</label>
+        <input type="text" id="in-birth" placeholder="1980/01/01" oninput="updateCard()">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>家族状況</label>
+      <input type="text" id="in-family" placeholder="妻、長女、二女" oninput="updateCard()">
+    </div>
+
+    <div class="form-group">
+      <label>住所・電話番号</label>
+      <textarea id="in-address" rows="2" placeholder="東京都板橋区...&#10;(tel: 03-XXXX-XXXX)" oninput="updateCard()"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>学校・会社</label>
+      <input type="text" id="in-work" placeholder="◯◯株式会社 / ◯◯学校" oninput="updateCard()">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>緊急連絡先①</label>
+        <input type="text" id="in-contact1" placeholder="父：090-XXXX-XXXX" oninput="updateCard()">
+      </div>
+      <div class="form-group">
+        <label>緊急連絡先②</label>
+        <input type="text" id="in-contact2" placeholder="母：090-XXXX-XXXX" oninput="updateCard()">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>顔写真</label>
+      <input type="file" id="in-photo" accept="image/*" onchange="loadPhoto(event)">
+    </div>
+
+    <h2 style="margin-top: 20px;">私の医療情報</h2>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>持病・治療中の病気</label>
+        <textarea id="in-disease" rows="2" placeholder="高血圧" oninput="updateCard()"></textarea>
+      </div>
+      <div class="form-group">
+        <label>服用している薬</label>
+        <textarea id="in-medicine" rows="2" placeholder="降圧剤（朝1錠）" oninput="updateCard()"></textarea>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>通院している病院・担当医</label>
+      <input type="text" id="in-hospital" placeholder="◯◯病院 内科（板橋 太郎 医師）" oninput="updateCard()">
+    </div>
+
+    <div class="form-group">
+      <label>アレルギー（食物・薬剤）</label>
+      <input type="text" id="in-allergy" placeholder="ペニシリン系、そば" oninput="updateCard()">
+    </div>
+
+    <div class="form-group">
+      <label>伝えたいこと</label>
+      <textarea id="in-memo" rows="2" placeholder="耳が聞こえにくいです / 避難時は配慮が必要です" oninput="updateCard()"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>家族の集合場所</label>
+      <input type="text" id="in-meet" placeholder="◯◯小学校 体育館裏" oninput="updateCard()">
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-pdf" onclick="generatePDF()">PDFダウンロード</button>
+      <button class="btn btn-print" onclick="printCard()">直接印刷</button>
+    </div>
+    <p class="notice">※入力データは外部サーバーに送信されません。</p>
+  </div>
+
+  <!-- 右：カードプレビュー -->
+  <div class="preview-section">
+    <div class="preview-title">リアルタイムプレビュー</div>
+    
+    <div id="card-container">
+      <div class="card-header">サバイバルカード SURVIVAL CARD</div>
+      
+      <table class="card-table">
+        <tr>
+          <td colspan="3" style="width: 50%;">
+            <div style="font-size: 10px; color: #555;">氏名（ふりがな）</div>
+            <div class="val" id="out-name"></div>
+          </td>
+          <td style="width: 12%;">
+            <div style="font-size: 10px; color: #555;">性別</div>
+            <div class="val" id="out-gender"></div>
+          </td>
+          <td style="width: 13%;">
+            <div style="font-size: 10px; color: #555;">血液型</div>
+            <div class="val" id="out-blood"></div>
+          </td>
+          <td style="width: 25%;">
+            <div style="font-size: 10px; color: #555;">生年月日</div>
+            <div class="val" id="out-birth"></div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="5">
+            <div style="font-size: 10px; color: #555;">家族状況</div>
+            <div class="val" id="out-family"></div>
+          </td>
+          <td rowspan="3" style="vertical-align: middle; text-align: center; padding: 2px;">
+            <div class="photo-box" id="photo-box">（写真）</div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="5">
+            <div style="font-size: 10px; color: #555;">住所</div>
+            <div class="val" id="out-address"></div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="5">
+            <div style="font-size: 10px; color: #555;">学校・会社</div>
+            <div class="val" id="out-work"></div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="3">
+            <div style="font-size: 10px; color: #555;">緊急連絡先①</div>
+            <div class="val" id="out-contact1"></div>
+          </td>
+          <td colspan="3">
+            <div style="font-size: 10px; color: #555;">緊急連絡先②</div>
+            <div class="val" id="out-contact2"></div>
+          </td>
+        </tr>
+      </table>
+
+      <div class="section-header">私の医療情報</div>
+
+      <table class="card-table">
+        <tr>
+          <td style="width: 50%;">
+            <div style="font-size: 10px; color: #555;">持病・治療中の病気</div>
+            <div class="val" id="out-disease"></div>
+          </td>
+          <td style="width: 50%;">
+            <div style="font-size: 10px; color: #555;">服用している薬</div>
+            <div class="val" id="out-medicine"></div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <div style="font-size: 10px; color: #555;">通院している病院・担当医</div>
+            <div class="val" id="out-hospital"></div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <div style="font-size: 10px; color: #555;">アレルギー（食物・薬剤）</div>
+            <div class="val" id="out-allergy"></div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <div style="font-size: 10px; color: #555;">伝えたいこと</div>
+            <div class="val" id="out-memo"></div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <div style="font-size: 10px; color: #555;">家族の集合場所</div>
+            <div class="val" id="out-meet"></div>
+          </td>
+        </tr>
+      </table>
+
+      <table class="card-table">
+        <tr>
+          <td rowspan="2" style="width: 30%; vertical-align: middle; font-weight: bold; font-size: 10px;">
+            災害伝言ダイヤル<br>「１７１」の使い方
+          </td>
+          <td class="bg-gray" style="width: 15%; text-align: center; font-size: 10px;">録音</td>
+          <td style="font-size: 10px;">１７１ ⇒ １ ⇒ 自宅の電話番号</td>
+        </tr>
+        <tr>
+          <td class="bg-gray" style="text-align: center; font-size: 10px;">再生</td>
+          <td style="font-size: 10px;">１７１ ⇒ ２ ⇒ 自宅の電話番号</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // リアルタイム反映
+  function updateCard() {
+    const fields = ['name', 'gender', 'blood', 'birth', 'family', 'address', 'work', 'contact1', 'contact2', 'disease', 'medicine', 'hospital', 'allergy', 'memo', 'meet'];
+    fields.forEach(f => {
+      document.getElementById('out-' + f).innerText = document.getElementById('in-' + f).value;
+    });
+  }
+
+  // 画像アップロード
+  function loadPhoto(event) {
+    const reader = new FileReader();
+    reader.onload = function() {
+      const photoBox = document.getElementById('photo-box');
+      photoBox.innerHTML = `<img src="${reader.result}">`;
+    }
+    if (event.target.files[0]) {
+      reader.readAsDataURL(event.target.files[0]);
+    }
+  }
+
+  // PDF生成＆ダウンロード
+  async function generatePDF() {
+    try {
+      // ライブラリが読み込まれているか確認
+      if (typeof window.jspdf === 'undefined') {
+        throw new Error('jsPDFライブラリが読み込まれていません。インターネット接続を確認するか、GitHub Pagesなどhttps環境で開いてください（file://で直接開くと動作しないことがあります）。');
+      }
+      if (typeof html2canvas === 'undefined') {
+        throw new Error('html2canvasライブラリが読み込まれていません。インターネット接続を確認するか、GitHub Pagesなどhttps環境で開いてください（file://で直接開くと動作しないことがあります）。');
+      }
+
+      const { jsPDF } = window.jspdf;
+      const card = document.getElementById('card-container');
+
+      // HTMLをキャプチャ
+      const canvas = await html2canvas(card, { scale: 3, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+
+      // A4 PDF作成 (クレジットカードサイズ・四つ折りサイズを想定して上部に配置)
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 100; // カード幅 mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 15, 15, imgWidth, imgHeight);
+      pdf.save('survival_card.pdf');
+    } catch (err) {
+      console.error(err);
+      alert('PDF出力に失敗しました。\n\n理由: ' + err.message);
+    }
+  }
+
+  // 直接印刷
+  function printCard() {
+    try {
+      window.print();
+    } catch (err) {
+      console.error(err);
+      alert('印刷に失敗しました。\n\n理由: ' + err.message);
+    }
+  }
+
+  // ページ読み込み時にライブラリの状態を確認し、コンソールに出力
+  window.addEventListener('load', function () {
+    if (typeof window.jspdf === 'undefined' || typeof html2canvas === 'undefined') {
+      console.warn('外部ライブラリ（html2canvas / jsPDF）の読み込みに失敗している可能性があります。ネットワーク環境やCDNへのアクセスを確認してください。');
+    }
+  });
+</script>
+
+</body>
+</html>
+
